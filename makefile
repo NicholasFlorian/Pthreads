@@ -10,7 +10,7 @@ boidspt: boids.c
 
 # project makes
 data: data.c
-	gcc data.c -o data -lncurses -lm -DNOGRAPHICS
+	gcc data.c -o data -pthread -lncurses -lm -DNOGRAPHICS 
 
 clean: 
 	rm boids boidspt data
