@@ -1,0 +1,202 @@
+Assignment 1 - Data and Task Parallelism Using Pthreads
+-------------------------------------------------------
+Due Friday, September 27, 2019
+
+Add Pthreads to a program in order to implement two common approaches
+to parallel code. Modify the Boids program to implement both a data
+parallel solution and as task parallel solution. You will need to submit
+two .c files, one for each of the two solutions and a makefile to build
+both programs on the linux.socs.uoguelph.ca server. 
+
+The Boids algorithm simulates flocking behaviour of birds. It calculates
+the position of each bird based upon the position and velocity of
+other birds. A tutorial describing the three rules for Boids is available at:
+       http://www.kfish.org/boids/pseudocode.html
+The three main rules described on this page are implemented in the boids.c
+program.  A fourth rule is implemented in the sample code.  This is called
+the "Tendency towards a particular place" on the boids tutorial web page.
+It causes the flock to move between two points on the screen.
+
+
+The data structures that you will need to access using Pthreads
+are defined at the start of boids.c. They are:
+
+        // user defined number of boids to create in the population
+int popsize;
+        // location and velocity of boids
+float **boidArray;
+        // change in velocity is stored for each boid (x,y,z)
+float **boidUpdate;
+
+The current position and velocity of the boids is stored in boidArray.
+Updates to the velocity are calculated and stored in boidUpdate.
+
+The starting code for the assignment is on Courselink in a file
+named a1.tar. If you compile this code it will create two executables.
+The first is named boids and it shows the algorithm running with a
+text based display. You should see the flocking behaviour when running
+this program. The second executable is boidspt which runs the same
+code as the previous program but without the graphical display.
+Use the non-graphical version of the program (boidspt) to perform timing tests.
+Do not use the graphical version (boids) to run any timing tests.
+
+The boids algorithm is implemented in the functions:
+   rule1();
+   rule2();
+   rule3();
+   moveFlock();
+which are all called from moveBoids(). You will need to update these functions
+to implement the Pthreads. You can reorganize these functions as long
+as you do not change the behaviour of the code.
+
+
+
+
+1. Data Parallelism
+-------------------
+Add Pthreads to the boids.c program to implement data parallelism. Name
+this program data.c and have it compile to an executable named data.
+
+This algorithm will require the threads to calculate separate parts
+of the two arrays which hold the boids position and velocity.
+
+Since this implementation is intended to use data parallelism, 
+each thread should be used to calculate a proportional amount
+of the data. For example, if there are two threads then each one
+should calculate half of the boids. If there are three threads then each
+one should calculate one third of the boids.
+
+The area of the program where you need to add the Pthreads is marked
+with the comments:
+        /*** start timing here ****/
+        /*** end timing here ****/
+Execute the Pthreads between these comments. You can modify any of the
+code between these comments. You can add threading operations to any
+of the existing functions that are called between these comments.
+You will need to add other code to manage the threads before and after
+these comments.
+
+If you examine the code in the five functions which implement the boids
+algorithm (rule1(), rule2(), rule3(), moveFlock(), and moveBoids()) you will
+notice the functions all contain for loops that count the number of boids
+in the population (popsize). To implement data parallelism, use Pthreads
+to calculate different sections of the two arrays (boidArray[][] and
+boidUpdate[][]). For example, if you have 12 elements in the arrays
+(boidArray[0 to 11][]):
+-if you create two threads, then each thread should calculate the results for 6 boids
+-if there are three theads then each thread should calculate the results fo 4 boids
+-if there are six threads then each thread should calculate the results for 2 boids
+
+Name your C program data.c and the executable data. 
+
+
+2. Task Parallelism
+-------------------
+This program also starts with the boids.c program but instead of having
+all threads perform the same actions on a different sections of the
+arrays each thread should perform a part of a calculation. The most likely
+place where this can be applied is to the loops in the four functions
+which control the movement of the boids. 
+
+To be clear, you should not divide the arrays (boidsArray[][] and boidUpdate[][])
+into sections and use threads to calculate parts of the array as you did
+for Part 1 of this assignment. You will need to implement separate
+threads for each operation in the functions. This means the number of
+threads will be fixed. A good place to start is to implement one
+thread for each primary operation for each primary operation in the
+five functions that update the boids position and velocity.
+If there is an opportunity for the threads to interfere with each other's
+operations then you will need to implement mutexes to prevent multiple
+threads from simultaneously writing to the same memory location.
+
+This is a more difficult task than applying data parallelism in part 1. 
+Your program may not run faster once Pthreads have been added.
+This is expected because the application is better suited to data
+parallelism then task parallelism. 
+
+Name your C program task.c and the executable task. 
+
+
+3. Timing Tests
+---------------
+Add code to the data.c and task.c programs to time the performance of the
+systems. Once this is done run several tests to show the performance increase
+or decrease of the two approaches to parallelism. The code indicates
+where the timing should start and end. Run several tests with different
+numbers of threads, and different population sizes. 
+
+Submit a file named results.txt which contains timing results for the data.c and
+task.c programs when run using a variety of population sizes and numbers of
+threads. Present these results in two tables with number of threads on the
+horizontal axis and scale on the vertical axis. For example:
+
+<PRE>
+data.c Results
+	Threads		1	2	3	4 ...
+Pop.Size
+   100
+   500
+   1000
+   ...
+<PRE>
+
+The defaults of 1000 iterations should be reasonable for the test but you
+can change this if you wish. Be sure to include the number of iterations
+that you used in the tests if you change it to anything other than 1000.
+
+Choose a reasonable number of threads and population size values to test your
+program.  Provide a description in the results.txt file of what the the
+timing tests suggest. Is there a point when number of threads or the size
+of the population benefits from the use of Pthreads? Is there an population
+size that is too small to benefit from the use of threads? Is task parallelism
+beneficial for this problem?
+
+Note that if a lot of people are using the server simultaneously then the
+program's performance will likely be poorer and possibly more variable than
+if fewer people are simultaneously running programs. This means that testing
+on the server may be difficult the night the assignment is due. You can run the
+timing tests on another system as long as you provide information about
+the testing platform in your results.txt file. This would include the
+type or processor, number of cores it supports, clock speed, and amount of
+memory in the testing platform.
+ 
+The boids.c program contains the following comments indicating where to place
+timing code.
+
+        /*** start timing here ****/
+
+        /*** end timing here ****/
+
+After the end comment your program should print out the time it spent
+running the code between these comments. You will be calculating the
+time spent in rendering the image. 
+
+
+Coding Practices
+----------------
+Write the code using standard stylistic practices. Use functions, 
+reasonable variable names, and consistent indentation.
+If the code is difficult for the TA to understand then you
+will lose marks.
+
+As usual, keep backups of your work using source control software.
+
+
+Submitting the Assignment
+-------------------------
+Submit the assignment using Courselink. Submit only the source code
+and the makefile. Bundle the code in a tar file and name it a1.tar.
+
+The assignments will be marked on the linux.socs.uoguelph.ca server.
+If you develop your code on a different platform then it is a good
+idea to put the #include files in an #ifdef for that system
+so they will still compile on the server. Test your program on the
+server before you submit it. 
+
+The TA will unpack your code and type "make". They will then try to
+run executables named data and task.  If the makefile is missing, the
+make command or executing the programs do not work then you will lose
+a substantial number of marks.
+
+It is always a good idea to unpack and test the file you are submitting
+to be sure that what you submit actually compiles. 
