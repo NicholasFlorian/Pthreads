@@ -586,7 +586,7 @@ int main(int argc, char *argv[]) {
    printf("Number of boids per thread %lf\n", tasksize);
    printf("Thread Data Ranges:\n");
    for(int i = 0; i < threadsize; i++)
-      printf("\tthread 1: [%d][%d] \t~ %d\n", 
+      printf("\tthread 1: [%d][%d]\n", 
          splitArray[i][0], 
          splitArray[i][1],
          splitArray[i][0] - splitArray[i][1]);
