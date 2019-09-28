@@ -12,6 +12,7 @@
 #include<stdlib.h>
 #include<math.h>
 #include<string.h>
+#include<time.h>
 #ifndef NOGRAPHICS
 #include<unistd.h>
 #include<ncurses.h>
