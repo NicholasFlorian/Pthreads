@@ -372,7 +372,13 @@ void moveBoids() {
 
 
    // all functions follow thesame pattern where each rule is multi threaded
-   // but each rule has its own thread barrier
+   // but each rule has its own thread barrier.
+   //
+   // this is due to the nature of the some of the rule, rule 2 could potentially
+   // interfere with the code the rule 1 if they were to run at the same time.
+   // 
+   // a thread barrier for each rule ensures that we dont run into any
+   // overlap while keeping the system multi threaded.
 
 
    // rule 1

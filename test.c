@@ -381,13 +381,15 @@ void moveBoids() {
    pthread_t threadMoveFlock;
    pthread_t threadMoveBoids;
 
+   void *owo;
+   owo = malloc(sizeof(int));
 
    // run threads 
-   pthread_create(&threadRule1, NULL, rule1, NULL);
-   pthread_create(&threadRule2, NULL, rule2, NULL);
-   pthread_create(&threadRule3, NULL, rule3, NULL);
-   pthread_create(&threadMoveFlock, NULL, moveFlock, NULL);
-   pthread_create(&threadMoveBoids, NULL, updateBoids, NULL);
+   pthread_create(&threadRule1, NULL, rule1, owo);
+   pthread_create(&threadRule2, NULL, rule2, owo);
+   pthread_create(&threadRule3, NULL, rule3, owo);
+   pthread_create(&threadMoveFlock, NULL, moveFlock, owo);
+   pthread_create(&threadMoveBoids, NULL, updateBoids, owo);
    
    // use one thread barrarier 
    pthread_join(threadRule1, NULL);
