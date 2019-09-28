@@ -71,8 +71,10 @@ float **boidArray;
 // change in velocity is stored for each boid (x,y,z)
 float **boidUpdate;
 
-// 
+// mutexes for each iteration for all 6 variables (BX to YZ) of boidArray
 pthread_mutex_t* mainMutexes;
+
+// mutexes for each iteration for all 6 variables (BX to YZ) of boidUpdate
 pthread_mutex_t* updateMutexes;
 
 // timing
@@ -381,15 +383,19 @@ void moveBoids() {
    pthread_t threadMoveFlock;
    pthread_t threadMoveBoids;
 
-   void *owo;
-   owo = malloc(sizeof(int));
+   // null data causes a segfault within pthread_create
+   // so indstead this variable can be used
+   void *voidier;
+
+   // give the void a size of 4
+   voidier = malloc(sizeof(int));
 
    // run threads 
-   pthread_create(&threadRule1, NULL, rule1, owo);
-   pthread_create(&threadRule2, NULL, rule2, owo);
-   pthread_create(&threadRule3, NULL, rule3, owo);
-   pthread_create(&threadMoveFlock, NULL, moveFlock, owo);
-   pthread_create(&threadMoveBoids, NULL, updateBoids, owo);
+   pthread_create(&threadRule1, NULL, rule1, voidier);
+   pthread_create(&threadRule2, NULL, rule2, voidier);
+   pthread_create(&threadRule3, NULL, rule3, voidier);
+   pthread_create(&threadMoveFlock, NULL, moveFlock, voidier);
+   pthread_create(&threadMoveBoids, NULL, updateBoids, voidier);
    
    // use one thread barrarier 
    pthread_join(threadRule1, NULL);
