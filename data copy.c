@@ -16,6 +16,8 @@
 #include<stdlib.h>
 #include<math.h>
 #include<string.h>
+#include<pthread.h>
+#include<time.h>
 
 // graphics
 #ifndef NOGRAPHICS
@@ -62,22 +64,24 @@ int max_y = 0, max_x = 0;
 
 // user defined number of boids to create in the population
 int popsize;
-
 // location and velocity of boids
 float **boidArray;
-
 // change in velocity is stored for each boid (x,y,z)
 float **boidUpdate;
 
-
 // the number of tasks
-int threadcount;
-
+int threadsize;
 // the number of boids per thread
 double tasksize;
-
+// the threads to be used
+pthread_t* threadArray;
 // array of splits
-int* splitArray;
+int** splitArray;
+
+// timing
+clock_t startTime;
+clock_t endTime;
+double elapsedTime;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -134,7 +138,7 @@ int drawBoids() {
 #endif
 
 // rule 1
-void rule1() {
+void rule1(int min, int max) {
    
    // variables
    int i;
@@ -144,7 +148,7 @@ void rule1() {
 
    // calculate centre of mass
    // calculated once and used for all updates in rule 1
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       cx += boidArray[i][BX];
       cy += boidArray[i][BY];
       cz += boidArray[i][BZ];
@@ -155,7 +159,7 @@ void rule1() {
 
    // update velocity, move towards centre of mass
    // initial use of boidUpdate[][] so overwrite old values
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       boidUpdate[i][BX] = (cx - boidArray[i][BX])/popsize;
       boidUpdate[i][BY] = (cy - boidArray[i][BY])/popsize;
       boidUpdate[i][BZ] = (cz - boidArray[i][BZ])/popsize;
@@ -174,14 +178,14 @@ float distance(int i, int j) {
 }
 
 // rule 2
-void rule2() {
+void rule2(int min, int max) {
    
    // variables
    int i, j;
    float cx, cy, cz;
 
    // keep boids from overlapping
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       cx = 0.0; cy = 0.0; cz = 0.0;
       for(j=0; j<popsize; j++) {
          if (i != j) {		// calculate when not the same boid
@@ -199,7 +203,7 @@ void rule2() {
 }
 
 // rule 3
-void rule3() {
+void rule3(int min, int max) {
    
    // variables
    int i;
@@ -209,7 +213,7 @@ void rule3() {
 
    // calculate average velocity
    // calculate once and use for all updates in rule 3
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       cx += boidArray[i][VX];
       cy += boidArray[i][VY];
       cz += boidArray[i][VZ];
@@ -219,7 +223,7 @@ void rule3() {
    cz /= popsize;
 
    // update velocity, move towards centre of mass
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       boidUpdate[i][BX] += (cx - boidArray[i][VX])/8.0;
       boidUpdate[i][BY] += (cy - boidArray[i][VY])/8.0;
       boidUpdate[i][BZ] += (cz - boidArray[i][VZ])/8.0;
@@ -229,7 +233,7 @@ void rule3() {
 
 
 // move the flock towards a point
-void moveFlock() {
+void moveFlock(int min, int max) {
    
    // variables
    int i;
@@ -256,7 +260,7 @@ void moveFlock() {
    }
    // add offset (px,py,pz) to each boid in order to pull it
    // towards the current target point
-   for(i=0; i<popsize; i++) {
+   for(i=min; i<max; i++) {
       boidUpdate[i][BX] += (px - boidArray[i][BX])/200.0;
       boidUpdate[i][BY] += (py - boidArray[i][BY])/200.0;
       boidUpdate[i][BZ] += (pz - boidArray[i][BZ])/200.0;
@@ -268,29 +272,65 @@ void moveFlock() {
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+// move a range of boids
+void *rangedMoveBoids(void* data){
+   
+   // variables
+   int i;
+   int min;
+   int max;
+
+   int* positions;
+
+
+   // assign
+   positions = (int*)data;
+   min = positions[0];
+   max = positions[1];
+
+
+   // run simulations
+   rule1(min, max);
+   rule2(min, max);
+   rule3(min, max);
+   moveFlock(min, max);
+
+
+   // TODO parallel this after the main threads are joined
+   // move boids by calculating updated velocity and new position
+   for (i = min; i < max; i++) {
+      
+      // update velocity for each boid
+      boidArray[i][VX] += boidUpdate[i][BX];
+      boidArray[i][VY] += boidUpdate[i][BY];
+      boidArray[i][VZ] += boidUpdate[i][BZ];
+      
+      // update position for each boid
+      boidArray[i][BX] += boidArray[i][VX];
+      boidArray[i][BY] += boidArray[i][VY];
+      boidArray[i][BZ] += boidArray[i][VZ];
+   }
+
+   return 1;
+}
+
 // move boids
 void moveBoids() {
    
    // variables
    int i;
 
-   rule1();
-   rule2();
-   rule3();
-   moveFlock();
+   for(i = 0; i < threadsize; i++){
 
-   // move boids by calculating updated velocity and new position
-   for (i=0; i<popsize; i++) {
-   // update velocity for each boid
-      boidArray[i][VX] += boidUpdate[i][BX];
-      boidArray[i][VY] += boidUpdate[i][BY];
-      boidArray[i][VZ] += boidUpdate[i][BZ];
-   // update position for each boid
-      boidArray[i][BX] += boidArray[i][VX];
-      boidArray[i][BY] += boidArray[i][VY];
-      boidArray[i][BZ] += boidArray[i][VZ];
+      pthread_create(&threadArray[i], NULL, rangedMoveBoids, splitArray[i]);
+   }
+
+   for(i = 0; i < threadsize; i++){
+
+      pthread_join(threadArray[i], NULL);
    }
 }
+
 
 // allocate arrays
 void allocateArrays() {
@@ -315,25 +355,34 @@ void allocateThreads() {
    int sum;
    int cur;
 
-   // calculate the number of splits based on 
-   tasksize = popsize / threadcount;
+
+   // assign
+   threadArray = malloc(sizeof(pthread_t) * threadsize);
 
    // malloc for the splits
-   splitArray = malloc(sizeof(int) * (threadcount + 1));
+   splitArray = malloc(sizeof(int*) * (threadsize));
+   for(int i = 0; i < threadsize; i++)
+      splitArray[i] = malloc(sizeof(int) * 2);
+   
+
+   // calculate the number of splits based on 
+   tasksize = (double)popsize / (double)threadsize;
 
    // generate the split until the second last split was created
    sum = 0;
    cur = 0;
-   for(int i = 0; i < popsize && cur < threadcount; i++){
+   splitArray[0][0] = 0;
+   for(int i = 0; i < popsize && cur < threadsize - 1; i++){
 
       // increase the sum until its the same or larger than tasksize
       sum++;
 
       // catch a split position
-      if(sum >= tasksize){
+      if((double)sum >= tasksize){
 
          // store position and iterate
-         splitArray[cur++] = i;
+         splitArray[cur++][1] = i;
+         splitArray[cur][0] = i;
 
          // reset the sum
          sum = 0;
@@ -341,8 +390,7 @@ void allocateThreads() {
    }
 
    // assign the last position to our array
-   splitArray[threadcount] = popsize;
-
+   splitArray[threadsize - 1][1] = popsize -1;
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -367,7 +415,7 @@ int main(int argc, char *argv[]) {
    count = ITERATIONS;
 
    // set the number of threads to use
-   threadcount = THREADS;
+   threadsize = THREADS;
 
 
    // read command line arguments for number of iterations and
@@ -382,7 +430,7 @@ int main(int argc, char *argv[]) {
             sscanf(argv[argPtr+1], "%d", &popsize);
             argPtr += 2;
          } else if (strcmp(argv[argPtr], "-t") == 0) {
-            sscanf(argv[argPtr+1], "%d", &threadcount);
+            sscanf(argv[argPtr+1], "%d", &threadsize);
             argPtr += 2;
          } else {
             printf("USAGE: %s <-i iterations> <-c pop_size> <-t threads>\n", argv[0]);
@@ -398,14 +446,11 @@ int main(int argc, char *argv[]) {
             printf("   threads -the number of threads to use for the application\n");
             printf("   make sure that you a valid number of threads. \n");
             printf("\n");
-            printf(" //\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\n");
+            printf(" //\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\n\n");
             exit(1);
          }
       }
    }
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
    // allocate space for theads and set up slitting
@@ -430,9 +475,6 @@ int main(int argc, char *argv[]) {
 
 #endif
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
 
    // place boids in initial positions
    initBoids();
@@ -450,15 +492,31 @@ int main(int argc, char *argv[]) {
 #ifdef NOGRAPHICS
 
    // print results
+   printf("Number of boids per thread %lf\n", tasksize);
+   printf("Thread Data Ranges:\n");
+   for(int i = 0; i < threadsize; i++)
+      printf("\tthread 1: [%d][%d] \t~ %d\n", 
+         splitArray[i][0], 
+         splitArray[i][1],
+         splitArray[i][0] - splitArray[i][1]);
+   
    printf("Number of iterations %d\n", count);
    printf("Number of boids %d\n", popsize);
 
-   /*** Start timing here ***/
 
+   /*** Start timing here ***/
+   startTime = clock();
+   
    for(i=0; i<count; i++) {
       moveBoids();
    }
+   
    /*** End timing here ***/
+   endTime = clock();
+   elapsedTime = (double)(endTime - startTime)/CLOCKS_PER_SEC;
+
+   printf("Time elapsed %lf\n", elapsedTime);
+
 #endif
 
 #ifndef NOGRAPHICS

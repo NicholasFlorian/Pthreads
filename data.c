@@ -79,9 +79,11 @@ pthread_t* threadArray;
 int** splitArray;
 
 // timing
-clock_t startTime;
-clock_t endTime;
+struct timespec startTime;
+struct timespec endTime;
 double elapsedTime;
+
+
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -138,13 +140,25 @@ int drawBoids() {
 #endif
 
 // rule 1
-void rule1(int min, int max) {
+void *rule1(void* data) {
    
    // variables
    int i;
    float cx, cy, cz;
 
+   // thread variables
+   int min;
+   int max;
+   int* positions;
+
+
    cx = 0.0; cy = 0.0; cz = 0.0;
+
+   // assign
+   positions = (int*)data;
+   min = positions[0];
+   max = positions[1];
+   
 
    // calculate centre of mass
    // calculated once and used for all updates in rule 1
@@ -165,6 +179,7 @@ void rule1(int min, int max) {
       boidUpdate[i][BZ] = (cz - boidArray[i][BZ])/popsize;
    }
 
+   return NULL;
 }
 
 // distance
@@ -178,11 +193,23 @@ float distance(int i, int j) {
 }
 
 // rule 2
-void rule2(int min, int max) {
+void *rule2(void* data) {
    
    // variables
    int i, j;
    float cx, cy, cz;
+   
+   // thread variables
+   int min;
+   int max;
+   int* positions;
+
+
+   // assign
+   positions = (int*)data;
+   min = positions[0];
+   max = positions[1];
+
 
    // keep boids from overlapping
    for(i=min; i<max; i++) {
@@ -200,14 +227,27 @@ void rule2(int min, int max) {
       boidUpdate[i][BY] += cy;
       boidUpdate[i][BZ] += cz;
    }
+
+   return NULL;
 }
 
 // rule 3
-void rule3(int min, int max) {
+void *rule3(void* data) {
    
    // variables
    int i;
    float cx, cy, cz;
+
+   int min;
+   int max;
+   int* positions;
+
+
+   // assign
+   positions = (int*)data;
+   min = positions[0];
+   max = positions[1];
+
 
    cx = 0.0; cy = 0.0; cz = 0.0;
 
@@ -229,17 +269,29 @@ void rule3(int min, int max) {
       boidUpdate[i][BZ] += (cz - boidArray[i][VZ])/8.0;
    }
 
+   return NULL;
 }
 
 
 // move the flock towards a point
-void moveFlock(int min, int max) {
+void *moveFlock(void* data) {
    
    // variables
    int i;
    static int count = 0;
    static int sign = 1;
    float px, py, pz;
+
+   // thread variables
+   int min;
+   int max;
+   int* positions;
+
+
+   // assign
+   positions = (int*)data;
+   min = positions[0];
+   max = positions[1];
 
 
    // pull flock towards two points as the program runs
@@ -267,21 +319,18 @@ void moveFlock(int min, int max) {
    }
    count++;
 
+   return NULL;
 }
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+void *updateBoids(void* data) {
 
-// move a range of boids
-void *rangedMoveBoids(void* data){
-   
-   // variables
+   // variables 
    int i;
+   
+   // thread variables
    int min;
    int max;
-
    int* positions;
-
 
    
    // assign
@@ -289,15 +338,8 @@ void *rangedMoveBoids(void* data){
    min = positions[0];
    max = positions[1];
 
+   //printf("STARTING   %d %d\n", min, max);
 
-   // run simulations
-   rule1(min, max);
-   rule2(min, max);
-   rule3(min, max);
-   moveFlock(min, max);
-
-   // TODO parallel this after the main threads are joined
-   // move boids by calculating updated velocity and new position
    for (i = min; i < max; i++) {
       
       // update velocity for each boid
@@ -311,28 +353,67 @@ void *rangedMoveBoids(void* data){
       boidArray[i][BZ] += boidArray[i][VZ];
    }
 
-   //printf("\t\tTHREAD COMPLETE [%d][%d]\n", min, max);
+   //printf("COMPLETING %d %d\n", min, max);
 
    return NULL;
 }
 
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 // move boids
 void moveBoids() {
-   
+
    // variables
    int i;
 
-   for(i = 0; i < threadsize; i++){
 
-      pthread_create(&threadArray[i], NULL, rangedMoveBoids, splitArray[i]);
-      //printf("\t\tRUNNING THREAD %d\n", i);
-   }
+   // all functions follow thesame pattern where each rule is multi threaded
+   // but each rule has its own thread barrier
 
-   for(i = 0; i < threadsize; i++){
 
+   // rule 1
+   for(i = 0; i < threadsize; i++)
+      pthread_create(&threadArray[i], NULL, rule1, splitArray[i]);
+
+   for(i = 0; i < threadsize; i++)
       pthread_join(threadArray[i], NULL);
-      //printf("\t\tJOINING THREAD %d\n", i);
-   }
+
+
+   // rule 2
+   for(i = 0; i < threadsize; i++)
+      pthread_create(&threadArray[i], NULL, rule2, splitArray[i]);
+   
+   for(i = 0; i < threadsize; i++)
+      pthread_join(threadArray[i], NULL);
+
+
+   // rule 3
+   for(i = 0; i < threadsize; i++)
+      pthread_create(&threadArray[i], NULL, rule3, splitArray[i]);
+
+   for(i = 0; i < threadsize; i++)
+      pthread_join(threadArray[i], NULL);
+   
+
+   // move flock
+   for(i = 0; i < threadsize; i++)
+      pthread_create(&threadArray[i], NULL, moveFlock, splitArray[i]);
+
+   for(i = 0; i < threadsize; i++)
+      pthread_join(threadArray[i], NULL);
+
+
+   // update boids
+   for(i = 0; i < threadsize; i++)
+      pthread_create(&threadArray[i], NULL, updateBoids, splitArray[i]);
+
+   for(i = 0; i < threadsize; i++)
+      pthread_join(threadArray[i], NULL);
+      
 }
 
 
@@ -509,16 +590,19 @@ int main(int argc, char *argv[]) {
 
 
    /*** Start timing here ***/
-   startTime = clock();
+   clock_gettime(CLOCK_MONOTONIC, &startTime);
    
    for(i=0; i<count; i++) {
       moveBoids();
    }
    
    /*** End timing here ***/
-   endTime = clock();
-   elapsedTime = (double)(endTime - startTime)/CLOCKS_PER_SEC;
+   clock_gettime(CLOCK_MONOTONIC, &endTime);
 
+
+   elapsedTime = (endTime.tv_sec - startTime.tv_sec);
+   elapsedTime += (endTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
+   
    printf("Time elapsed %lf\n", elapsedTime);
 
 #endif
