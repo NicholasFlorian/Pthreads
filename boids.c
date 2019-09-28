@@ -48,6 +48,11 @@ float **boidArray;
 	// change in velocity is stored for each boid (x,y,z)
 float **boidUpdate;
 
+// timing
+struct timespec startTime;
+struct timespec endTime;
+double elapsedTime;
+
 
 void initBoids() {
 int i;
@@ -308,12 +313,21 @@ int argPtr;
    printf("Number of iterations %d\n", count);
    printf("Number of boids %d\n", popsize);
 
-	/*** Start timing here ***/
+   /*** Start timing here ***/
+   clock_gettime(CLOCK_MONOTONIC, &startTime);
 
    for(i=0; i<count; i++) {
       moveBoids();
    }
-	/*** End timing here ***/
+   /*** End timing here ***/
+   clock_gettime(CLOCK_MONOTONIC, &endTime);
+
+
+   elapsedTime = (endTime.tv_sec - startTime.tv_sec);
+   elapsedTime += (endTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
+   
+   printf("Time elapsed %lf\n", elapsedTime);
+
 #endif
 
 #ifndef NOGRAPHICS
